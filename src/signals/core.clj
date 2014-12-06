@@ -98,10 +98,100 @@
                    (reset! head xs)
                    x)))))
 
+
+(defn range!*! [& args] 
+  (seq-iter (apply range args)))
+
+(def t (range!*! 5))
+
 (defn process [src]
   (loop [line 0 v @src]
     (when v 
       (println line ") " v) 
       (recur (inc line) @src))))
+
+(def source (atom 0))
+
+(defn source!*! [sig]
+  (fn [] @sig))
+
+(defn pushify
+  [src dest]
+  (fn [a]
+    (let [v (src a)]
+      (if (or (= :CONTINUE v) (= :DONE v))
+        v 
+        (dest v))
+      )))
+
+((pushify #(- % 5) #(+ 45 %)) 10)
+
+;; this could be rewritten using loop and make it non stack consuming...
+;; This could also be rewritten to remove the source function and move it to the caller 
+(defn ||> 
+  [& args] 
+  (let [[a b & c] args
+        [pushify-func push-funcs]
+        (if (= :pushifier a) 
+          [b c]
+          [pushify args])
+        [x y & z] push-funcs]
+    (reduce
+      #(pushify-func %1 %2)
+      (pushify-func x y)
+      z)))
+
+(def comp-chain
+  (||> 
+     #(+ 45 %)
+     #(* 3 %)))
+
+(comp-chain 45)
+
+
+(defn reduce!*! 
+  [pform red-fn initial source-sig]
+  (loop [accum initial v @source-sig]
+    (if v
+      (let [pform-v (pform v)] 
+        (case pform-v
+          :DONE accum
+          :CONTINUE (recur accum @source-sig)
+          (recur (red-fn accum pform-v) @source-sig)))
+      accum)))
+
+(reduce!*! comp-chain conj [] (range!*! 50))
+
+(defn take!*!
+  [num-to-take]
+  (let [v (volatile! num-to-take)] 
+    (fn [a]
+      (let [n (vswap! v dec)]
+        (if (>= n 0)
+          a
+          :DONE)))))
+
+(defn partition!*! 
+  [n]
+  (let [counter (volatile! n)
+        v (volatile! [])]
+    ;(fn [a]
+    ;  (let [indx (vswap! counter dec) 
+            
+    ;        ]) 
+    ;  )
+    )  
+  )
+
+(def maybe-chain
+  (||> 
+    #(do (println ">>> " %) %)
+    #(* % 10) 
+    (take!*! 5)
+    #(do (println "~~~ " %) %)
+    ))
+
+
+(reduce!*! maybe-chain conj [] (range!*! 50))
 
 
