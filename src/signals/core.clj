@@ -115,19 +115,37 @@
 (defn source!*! [sig]
   (fn [] @sig))
 
+(deftype Last [a]
+  IDeref
+  (deref [_] a))
+
+(defn last!*! 
+  [a]
+  (Last. a))
+
+(defn is-last? [a]
+  (instance? Last a))
+
+
 (defn pushify
   [src dest]
   (fn [a]
+    ;(if (or (= :CONTINUE a) (= :DONE a))
+    ;  a
+    ; (dest (src a)) )
     (let [v (src a)]
-      (if (or (= :CONTINUE v) (= :DONE v))
+      (if (or (= :CONTINUE v) (= :DONE v) (is-last? v))
         v 
-        (dest v))
-      )))
+        (dest v)))
+    ))
+
+(defn maybe-pushify
+  [src dest]
+  (fn [a])
+  )
 
 ((pushify #(- % 5) #(+ 45 %)) 10)
 
-;; this could be rewritten using loop and make it non stack consuming...
-;; This could also be rewritten to remove the source function and move it to the caller 
 (defn ||> 
   [& args] 
   (let [[a b & c] args
@@ -148,16 +166,16 @@
 
 (comp-chain 45)
 
-
 (defn reduce!*! 
-  [pform red-fn initial source-sig]
-  (loop [accum initial v @source-sig]
+  [pform red-fn initial source-sig!*!]
+  (loop [accum initial v @source-sig!*!]
     (if v
       (let [pform-v (pform v)] 
-        (case pform-v
-          :DONE accum
-          :CONTINUE (recur accum @source-sig)
-          (recur (red-fn accum pform-v) @source-sig)))
+        (cond 
+          (is-last? pform-v) (red-fn accum @pform-v)
+          (= :DONE pform-v) accum 
+          (= :CONTINUE pform-v) (recur accum @source-sig!*!)
+          :else (recur (red-fn accum pform-v) @source-sig!*!)))
       accum)))
 
 (reduce!*! comp-chain conj [] (range!*! 50))
@@ -167,31 +185,34 @@
   (let [v (volatile! num-to-take)] 
     (fn [a]
       (let [n (vswap! v dec)]
-        (if (>= n 0)
+        (if (> n 0)
           a
-          :DONE)))))
+          (last!*! a))))))
 
 (defn partition!*! 
   [n]
-  (let [counter (volatile! n)
+  (let [counter (volatile! 0)
         v (volatile! [])]
-    ;(fn [a]
-    ;  (let [indx (vswap! counter dec) 
-            
-    ;        ]) 
-    ;  )
-    )  
-  )
+    (fn [a]
+      (let [indx (vswap! counter inc)]
+        (if (>= indx n)
+          (let [out (conj @v a)]
+            (vreset! v [])
+            (vreset! counter 0)
+            out) 
+          (do 
+            (vswap! v conj a)
+            :CONTINUE))))))
 
-(def maybe-chain
+(def chain
   (||> 
     #(do (println ">>> " %) %)
     #(* % 10) 
+    (partition!*! 2)
     (take!*! 5)
     #(do (println "~~~ " %) %)
     ))
 
-
-(reduce!*! maybe-chain conj [] (range!*! 50))
+(reduce!*! chain conj [] (range!*! 50))
 
 
