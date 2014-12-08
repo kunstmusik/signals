@@ -96,7 +96,7 @@
   [time-cache]
   (some (fn [[a b]] (not= (get-time-counter a) b)) time-cache))
 
-(defn create-signal-reactor [func args]
+(defn create-lazy-signal-reactor [func args]
   (let [sigs (into #{} (filter #(satisfies? Signal %) args))
         time-cache (volatile! (reduce #(assoc %1 %2 -1) {} sigs))
         cur-value (volatile! nil)
@@ -134,6 +134,47 @@
       (activated? [r] @activate-state)
 
       Object
+      (toString [r] "Lazy Signal Reactor")
+      )))
+
+(defn create-signal-reactor [func args]
+  (let [sigs (into #{} (filter #(satisfies? Signal %) args))
+        time-cache (volatile! (reduce #(assoc %1 %2 -1) {} sigs))
+        cur-value (volatile! nil)
+        activate-state (volatile! false)
+        time-atom (atom -1)
+        watchers-atom (atom #{})] 
+    (reify 
+      IDeref 
+      (deref [x] @cur-value)
+
+      Signal
+      (get-time-counter [s] 
+        (locking s 
+          @time-atom))
+      (changed? [s time-counter] (= @time-atom time-counter))
+      (add-time-watcher [s watcher]
+        (swap! watchers-atom conj watcher))
+      (remove-time-watcher [s watcher]
+        (swap! watchers-atom disj watcher)) 
+
+      Reactor
+      (signal-updated [x v]
+        (locking x 
+          (let [v (apply apply!*! func args)]
+            (vreset! cur-value v)
+            (vreset! time-cache (reduce #(assoc %1 %2 (get-time-counter %2)) {} sigs)))
+        (swap! time-atom inc))
+        (notify-time-watchers x @watchers-atom))
+      (deactivate [r] 
+        (doseq [x sigs] (remove-time-watcher x r)) 
+        (vreset! activate-state false))
+      (activate [r] 
+        (doseq [x sigs] (add-time-watcher x r)) 
+        (vreset! activate-state true))
+      (activated? [r] @activate-state)
+
+      Object
       (toString [r] "Signal Reactor")
       )))
 
@@ -160,24 +201,39 @@
 
 (defn r!*! 
   "Creates a Signal Reactor block.  Reactors will signal updates when signals
-  they depend on are updated. Values should be dereferenced from the Reactor.
-  Reactors are also Signals but not MutableSignals."
+  they depend on are updated. New values are calculated on update signal from 
+  dependency.  Signal Reactors are Signals but not MutableSignals. This should
+  be used for values that are coordinated with a reactive graph."
   [func & args] 
   (let [reactor (create-signal-reactor func args)]
     (activate reactor)
     reactor)) 
 
+(defn l!*! 
+  "Creates a Lazy Signal Reactor block.  Reactor will signal updates when
+  signals they depend on are updated. New value will not be calculated until
+  first deref. Lazy Signal Reactors are Signals but not MutableSignals. 
+  This should be used for situations where reads are not coordinated with 
+  reactive graph and less frequent than writes to l!*! block."
+  [func & args] 
+  (let [reactor (create-lazy-signal-reactor func args)]
+    (activate reactor)
+    reactor)) 
+
 (defn d!*!
   "Creates a deref block from time-varying function. Each deref results in an apply!*!
-  of given func and args. This is not a Signal nor Reactor."
+  of given func and args. This is not a Signal nor Reactor. Useful to create sources 
+  that are pull-based."
   [func & args]
   (reify 
       IDeref
       (deref [s] 
         (apply!*! func args))))
 
+(def !*! d!*!)
+
 (defn e!*!
-  "Creates an event block using pure functions and time-varying args. 
+  "Creates an event block using a function with time-varying args. 
   This is not a Signal, but is a Reactor, and will fire its functions and args when
   an update is triggered by signal dependencies."
   [func & args]
@@ -199,8 +255,17 @@
       (filter #(< (count %) 4))) 
     a))
 
+(def l 
+  (r!*! 
+    into [] 
+    (comp 
+      (map (comp clojure.string/lower-case :first-name))
+      (map clojure.string/lower-case)
+      (filter #(< (count %) 4))) 
+    a))
 
 (println "First b" @b)
+(println "First l" @l)
 
 (reset!*! 
   a 
@@ -211,7 +276,8 @@
    {:first-name "PAN"} 
    ])
 
-(println "First b" @b)
+(println "second b" @b)
+(println "second l" @l)
 
 (reset!*! a [
    {:first-name "maria"}
@@ -228,7 +294,7 @@
 (def print-status3
   #(println "Latest Users: " @b))
 
-@b
+(println "X: " @b @l)
 (print-status)
 (print-status2)
 (print-status3)
@@ -249,7 +315,7 @@
 
 (def input (d!*! read-line))
 
-(defn seq-iter [s] 
+(defn seq->signal [s] 
   (let [head (atom s)]
     (reify IDeref
       (deref [_] (let [[x & xs] @head] 
@@ -257,7 +323,7 @@
                    x)))))
 
 (defn range!*! [& args] 
-  (seq-iter (apply range args)))
+  (seq->signal (apply range args)))
 
 (def t (range!*! 5))
 
@@ -324,7 +390,7 @@
 (comp-chain 45)
 
 
-;; experiments with reductions:
+;; experiments with reductions, iteratees:
 ;; so far, doesn't handle EOF, or if func produces multiple outs for single in
 ;; probably better at this point to just focus on the pushy chain and context
 
