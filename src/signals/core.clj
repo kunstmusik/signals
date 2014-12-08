@@ -1,6 +1,9 @@
 (ns signals.core
   (:import [clojure.lang IDeref Atom]))
 
+;; to be used to do batch firing of signal updates...
+(def ^:dynamic batch-update false)
+
 (defprotocol Signal
   (get-time-counter [s])
   (changed? [s time-counter])
@@ -12,36 +15,43 @@
   (swap!*! [s v]))
 
 (defprotocol Reactor
-  (signal-updated [x v])
+  (signal-updated [r sig])
   (deactivate [r])
   (activate [r])
-  (activated? [r])
-  )
+  (activated? [r]))
 
-;; extensions
+;; UTILITY FUNCTIONS FOR IMPLEMENTING SIGNALS
+
+(defn notify-time-watchers [sig watchers] 
+  (doseq [x watchers]
+    (signal-updated x sig)))
+
+
+;; For extended types, use meta map (not ideal, but not sure of other way at the moment)
 (defn add-time-watcher-impl [obj v]
   (locking obj 
     (let [t (get (meta obj) :time-watchers #{})]
-      (alter-meta! obj #(assoc % :time-watchers (assoc t v))))))
+      (alter-meta! obj #(assoc % :time-watchers (conj t v))))))
 
 (defn remove-time-watcher-impl [obj v]
   (locking obj 
     (let [t (get (meta obj) :time-watchers #{})]
       (alter-meta! obj #(assoc % :time-watchers (disj t v))))))
 
-(defn notify-time-watchers [obj] 
-  (doseq [x (get (meta obj) :time-watchers)]
-    (signal-updated x obj)))
+(defn notify-time-watchers-impl [sig] 
+  (when-let [watchers (:time-watchers (meta sig))]
+    (notify-time-watchers sig watchers)))
 
 (defn get-time-impl [obj]
   (locking obj
-    (let [t (:time-counter (meta obj))]
-      (if t t 0))))
+    (get (meta obj) :time-counter -1)))
 
 (defn inc-time-impl [obj]
   (locking obj
-    (let [t (get (meta obj) :time-counter 0)]
+    (let [t (get (meta obj) :time-counter -1)]
       (alter-meta! obj #(assoc % :time-counter (inc t))))))
+
+;; EXTENSIONS TO EXISTING TYPES
 
 (extend-type Atom
   Signal
@@ -56,31 +66,27 @@
     (locking s 
       (reset! s v) 
       (inc-time-impl s) 
-      (notify-time-watchers s)))
+      (notify-time-watchers-impl s)
+      v))
   (swap!*! [s v] 
     (locking s 
       (swap! s v) 
       (inc-time-impl s) 
-      (notify-time-watchers s))))
-
-;Dynamic argument resolution
-(deftype DynamicArg  [func args]) 
-(defn !*! 
-  [func & args]
-  (DynamicArg. func args))
+      (notify-time-watchers-impl s)
+      @s)))
 
 (defn apply!*!
   ([func] (func))
   ([func args]
    (if args
      (->> (if (sequential? args) args [args])
-        (map #(if (satisfies? Signal %)
-                @%
+        (map #(if (instance? IDeref %)
+                (deref %)
                 %))
         (apply func))
      (func)))
   ([func arg & args]
-   (apply!*! func  (list* arg args))))
+   (apply!*! func (list* arg args))))
 
 (defn partial!*!
   [& args]
@@ -90,51 +96,99 @@
   [time-cache]
   (some (fn [[a b]] (not= (get-time-counter a) b)) time-cache))
 
-(defn create-reactor [func args]
-  (let [sigs (filter #(satisfies? Signal %) args)
+(defn create-signal-reactor [func args]
+  (let [sigs (into #{} (filter #(satisfies? Signal %) args))
         time-cache (volatile! (reduce #(assoc %1 %2 -1) {} sigs))
         cur-value (volatile! nil)
         activate-state (volatile! false)
-        ] 
+        time-atom (atom -1)
+        watchers-atom (atom #{})] 
     (reify 
       IDeref 
       (deref [x]  
         (locking x 
           (when (dependencies-updated? @time-cache)
-            (let [v (apply!*! func args)]
+            (let [v (apply apply!*! func args)]
               (vreset! cur-value v)
               (vreset! time-cache (reduce #(assoc %1 %2 (get-time-counter %2)) {} sigs)))) 
           @cur-value))
 
       Signal
-      (get-time-counter [s] (get-time-impl s))
-      (changed? [s time-counter] (= (get-time-impl s) time-counter))
+      (get-time-counter [s] @time-atom)
+      (changed? [s time-counter] (= @time-atom time-counter))
       (add-time-watcher [s watcher]
-        (add-time-watcher-impl s watcher))
+        (swap! watchers-atom conj watcher))
       (remove-time-watcher [s watcher]
-        (remove-time-watcher-impl s watcher)) 
+        (swap! watchers-atom disj watcher)) 
 
       Reactor
       (signal-updated [x v]
-        (inc-time-impl x)
-        (notify-time-watchers x))
-      (deactivate [r] (doseq [x sigs] remove-time-watcher r))
-      (activate [r] (doseq [x sigs] add-time-watcher r))
+        (swap! time-atom inc)
+        (notify-time-watchers x @watchers-atom))
+      (deactivate [r] 
+        (doseq [x sigs] (remove-time-watcher x r)) 
+        (vreset! activate-state false))
+      (activate [r] 
+        (doseq [x sigs] (add-time-watcher x r)) 
+        (vreset! activate-state true))
       (activated? [r] @activate-state)
+
+      Object
+      (toString [r] "Signal Reactor")
+      )))
+
+
+(defn create-reactor [func args]
+  (let [sigs (into #{} (filter #(satisfies? Signal %) args))
+        activate-state (volatile! false)] 
+    (reify 
+      Reactor
+      (signal-updated [x v]
+        (apply!*! func args))
+      (deactivate [r] 
+        (doseq [x sigs] (remove-time-watcher x r)) 
+        (vreset! activate-state false))
+      (activate [r] 
+        (doseq [x sigs] (add-time-watcher x r)) 
+        (vreset! activate-state true))
+      (activated? [r] @activate-state)
+
+      Object
+      (toString [r] "Event Reactor")
+
       )))
 
 (defn r!*! 
-  "Creates a Reactor block.  Reactors will signal updates when signals they depend on
-  are updated. Values should be dereferenced from the Reactor. Reactors are also Signals
-  but not MutableSignals."
+  "Creates a Signal Reactor block.  Reactors will signal updates when signals
+  they depend on are updated. Values should be dereferenced from the Reactor.
+  Reactors are also Signals but not MutableSignals."
   [func & args] 
-  (let [reactor (create-reactor func args)]
+  (let [reactor (create-signal-reactor func args)]
     (activate reactor)
     reactor)) 
+
+(defn d!*!
+  "Creates a deref block from time-varying function. Each deref results in an apply!*!
+  of given func and args. This is not a Signal nor Reactor."
+  [func & args]
+  (reify 
+      IDeref
+      (deref [s] 
+        (apply!*! func args))))
+
+(defn e!*!
+  "Creates an event block using pure functions and time-varying args. 
+  This is not a Signal, but is a Reactor, and will fire its functions and args when
+  an update is triggered by signal dependencies."
+  [func & args]
+  (let [reactor (create-reactor func args)]
+    (activate reactor)
+    reactor))
 
 ;; testing code
 
 (def a (atom []))
+(def e (e!*! println "TEST>>>" a))
 
 (def b 
   (r!*! 
@@ -144,6 +198,9 @@
       (map clojure.string/lower-case)
       (filter #(< (count %) 4))) 
     a))
+
+
+(println "First b" @b)
 
 (reset!*! 
   a 
@@ -186,11 +243,11 @@
   [actions]
   (doseq [[func & args] actions]
     (apply!*! func args)))
+
 (process-actions actions)
 
 
-
-(def input (r!*! read-line))
+(def input (d!*! read-line))
 
 (defn seq-iter [s] 
   (let [head (atom s)]
@@ -198,7 +255,6 @@
       (deref [_] (let [[x & xs] @head] 
                    (reset! head xs)
                    x)))))
-
 
 (defn range!*! [& args] 
   (seq-iter (apply range args)))
