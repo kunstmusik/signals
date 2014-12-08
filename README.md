@@ -4,7 +4,7 @@ Experiments with time-varying signals.
 
 ## Usage
 
-Nothing to report here yet. :) 
+Nothing to report here yet. Please see the [documentation][doc/intro.md] for on-going design work.
 
 ## License
 
