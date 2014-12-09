@@ -26,7 +26,6 @@
   (doseq [x watchers]
     (signal-updated x sig)))
 
-
 ;; For extended types, use meta map (not ideal, but not sure of other way at the moment)
 (defn add-time-watcher-impl [obj v]
   (locking obj 
@@ -221,9 +220,10 @@
     reactor)) 
 
 (defn d!*!
-  "Creates a deref block from time-varying function. Each deref results in an apply!*!
-  of given func and args. This is not a Signal nor Reactor. Useful to create sources 
-  that are pull-based."
+  "Creates a deref block from time-varying function.  Each deref results in an
+  apply!*! of given func and args.  These are PullSignals, and are not Signals
+  nor Reactor. These are not used for reactive purposes, though may be a part of 
+  a reactive graph."
   [func & args]
   (reify 
       IDeref
