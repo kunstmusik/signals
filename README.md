@@ -1,10 +1,10 @@
-# signals
+# Signals
 
-Experiments with time-varying signals.
+Library for working with time-varying signals. 
 
 ## Usage
 
-Nothing to report here yet. Please see the [documentation][doc/intro.md] for on-going design work.
+Please see the [documentation][doc/intro.md] for on-going design work.
 
 ## License
 
