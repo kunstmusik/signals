@@ -3,10 +3,15 @@
 
 (comment
 
+
+;; ====================================
+;; Example: e!*!, l!*!, and r!*! blocks 
+;; ====================================
+
   (def a (atom []))
   (def e (e!*! println "TEST>>>" a))
 
-  (def b 
+  (def reactive-signal 
     (r!*! 
       into [] 
       (comp 
@@ -15,8 +20,8 @@
         (filter #(< (count %) 4))) 
       a))
 
-  (def l 
-    (r!*! 
+  (def lazy-rs
+    (l!*! 
       into [] 
       (comp 
         (map (comp clojure.string/lower-case :first-name))
@@ -24,8 +29,8 @@
         (filter #(< (count %) 4))) 
       a))
 
-  (println "First b" @b)
-  (println "First l" @l)
+  (println "First b" @reactive-signal)
+  (println "First l" @lazy-rs)
 
   (reset!
     a 
@@ -36,25 +41,26 @@
      {:first-name "PAN"} 
      ])
 
-  (println "second b" @b)
-  (println "second l" @l)
+  (println "second b" @reactive-signal)
+  (println "second l" @lazy-rs)
 
   (reset! a [
              {:first-name "maria"}
              {:first-name "PAN"} 
              ])
 
+  ;; Note with partial!*!, pass in the IDeref itself
   (def print-status 
-    (partial!*! println "Latest Users: " b))
+    (partial!*! println "Latest Users: " reactive-signal))
 
   (defn print-status2
     []
-    (println "Latest Users: " @b))
+    (println "Latest Users: " @reactive-signal))
 
   (def print-status3
-    #(println "Latest Users: " @b))
+    #(println "Latest Users: " @reactive-signal))
 
-  (println "X: " @b @l)
+  (println "X: " @reactive-signal @lazy-rs)
   (print-status)
   (print-status2)
   (print-status3)
@@ -78,9 +84,11 @@
   (defn seq->signal [s] 
     (let [head (atom s)]
       (reify IDeref
-        (deref [_] (let [[x & xs] @head] 
+        (deref [sig] 
+          (locking sig 
+            (let [[x & xs] @head] 
                      (reset! head xs)
-                     x)))))
+                     x))))))
 
   (defn range!*! [& args] 
     (seq->signal (apply range args)))
@@ -93,10 +101,31 @@
         (println line ") " v) 
         (recur (inc line) @src))))
 
-  (def s (atom 0))
+;; ==================
+;; Example: Blog Post
+;; ==================
 
-  (defn source!*! [sig]
-    (fn [] @sig))
+(def author (atom ""))
+(def title (atom ""))
+(def body (atom ""))
+(defn create-blog-post [author title body]
+  (format "Author: %s\nTitle: %s\nBody:\n%s" author title body))
+(def blog-post (l!*! create-blog-post author title body))
+
+(print @blog-post)
+
+(reset! author "Steven")
+(reset! title "My Article")
+(reset! body "Body of text.\n Line 2.")
+
+(print @blog-post)
+
+
+;; experiments with reductions, iteratees: so far, doesn't handle EOF, or
+;; if func produces multiple outs for single in probably better at this
+;; point to just focus on the pushy chain and context, most likely don't
+;; need this
+
 
   (deftype Last [a]
     IDeref
@@ -150,10 +179,6 @@
 (comp-chain 45)
 
 
-;; experiments with reductions, iteratees:
-;; so far, doesn't handle EOF, or if func produces multiple outs for single in
-;; probably better at this point to just focus on the pushy chain and context
-
 (defn reduce!*! 
   [pform red-fn initial source-sig!*!]
   (loop [accum initial v @source-sig!*!]
@@ -204,21 +229,5 @@
 
 (reduce!*! chain conj [] (range!*! 50))
 
-;; Example: Blog Post
-
-(def author (atom ""))
-(def title (atom ""))
-(def body (atom ""))
-(defn create-blog-post [author title body]
-  (format "Author: %s\nTitle: %s\nBody:\n%s" author title body))
-(def blog-post (l!*! create-blog-post author title body))
-
-(print @blog-post)
-
-(reset! author "Steven")
-(reset! title "My Article")
-(reset! body "Body of text.\n Line 2.")
-
-(print @blog-post)
 
 )
