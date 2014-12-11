@@ -4,7 +4,7 @@ Library for working with time-varying signals.
 
 ## Usage
 
-Please see the [documentation][doc/intro.md] for on-going design work.
+Please see the [documentation](doc/intro.md) for on-going design work.
 
 ## License
 
