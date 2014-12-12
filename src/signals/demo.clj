@@ -79,27 +79,22 @@
   (process-actions actions)
 
 
+;; =========================================
+;; Example: Same function, different sources 
+;; =========================================
+
   (def input (d!*! read-line))
-
-  (defn seq->signal [s] 
-    (let [head (atom s)]
-      (reify IDeref
-        (deref [sig] 
-          (locking sig 
-            (let [[x & xs] @head] 
-                     (reset! head xs)
-                     x))))))
-
-  (defn range!*! [& args] 
-    (seq->signal (apply range args)))
-
-  (def t (range!*! 5))
+  (def t (seq!*! (range 5)))
 
   (defn process [src]
     (loop [line 0 v @src]
       (when v 
         (println line ") " v) 
         (recur (inc line) @src))))
+
+  (process t)
+  ;; evaluate in REPL to grab input from stdin
+  (process input)
 
 ;; ==================
 ;; Example: Blog Post
