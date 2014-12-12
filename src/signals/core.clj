@@ -198,3 +198,56 @@
     (activate reactor)
     reactor))
 
+(defn foldp!*! 
+  "Implementation of Elm-style foldp.  Func is an update function that
+  calculates on the previous value of the foldp!*! block and the new
+  values from the signals. The arity of func must match 1 (for the
+  accumulator) + number of signals."
+  [func init & sigs]
+  (let [cur-value (atom init)
+        args (list* cur-value sigs)
+        activate-state (volatile! false)
+        watches-atom (atom {})
+        ref-atom (atom nil)
+        watch-fn (fn [k r o n] 
+                    (let  [old-val @cur-value
+                           new-val (apply!*! func args)] 
+                      (reset! cur-value new-val)
+                    (notify-watches @watches-atom @ref-atom old-val new-val)))
+        r (reify 
+            IDeref 
+            (deref [x] @cur-value)
+
+            IRef
+            (setValidator [x validator])
+            (getValidator [x] nil)
+            (getWatches [x] @watches-atom)
+            (addWatch [x k callback]
+              (swap! watches-atom assoc k callback) 
+              x)
+            (removeWatch [x k]
+              (swap! watches-atom dissoc k) 
+              x)
+
+            Reactor
+            (deactivate [r] 
+              (locking r 
+                (when @activate-state 
+                  (doseq [x sigs] (remove-watch x r)) 
+                  (vreset! activate-state false))))
+            (activate [r] 
+              (locking r
+                (when-not @activate-state
+                  (doseq [x sigs] (add-watch x r watch-fn)) 
+                  (vreset! activate-state true))))
+            (activated? [r] 
+              (locking r
+                @activate-state))
+
+            Object
+            (toString [r] "foldp!*! Signal Reactor")
+            ) 
+        ] 
+    (activate r)
+    (reset! ref-atom r)
+    ))

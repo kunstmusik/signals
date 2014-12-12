@@ -98,3 +98,35 @@
       (is (= 8 @out))
       (is (= 8 @r-block)) 
       )))
+
+
+(deftest foldp!*!-test
+  (testing "foldp!*! single signal"
+    (let [a (atom 0)
+          f (foldp!*! + 10 a)]
+     
+      (is (= 10 @f)) 
+      (reset! a 2)
+      (is (= 12 @f)) 
+      (reset! a 2)
+      (is (= 14 @f)) 
+      (swap! a inc)
+      (is (= 17 @f)) 
+      ))
+  (testing "foldp!*! two signals"
+    (let [a (atom 0)
+          b (atom 0)
+          f (foldp!*! + 10 a b)]
+      (is (= 10 @f)) 
+      (reset! a 2)
+      (is (= 12 @f)) 
+      (reset! a 2)
+      (is (= 14 @f)) 
+      (swap! a inc)
+      (is (= 17 @f)) 
+      (reset! b 2)
+      (is (= 22 @f)) 
+      (reset! b 0)
+      (is (= 25 @f)) 
+      ))
+  )
