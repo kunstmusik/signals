@@ -1,5 +1,6 @@
 (ns signals.demo
   (:require [signals.core :refer :all]
+            [signals.protocols :refer :all]
             [clojure.set :refer :all]))
 
 (comment
@@ -120,7 +121,7 @@
 (println @high-scores)
 
 ;; update the high-scores
-(conj!*! high-scores [:user :me :score 1000])
+(swap!*! high-scores conj [:user :me :score 1000])
 
 ; prints "[[:user :me :score 1000]]"
 (println @high-scores)
@@ -130,7 +131,7 @@
 (println @user-location)
 
 ;; updated the 2nd part of location to 10
-(assoc!*! user-location 1 10)
+(swap!*! user-location assoc 1 10)
 
 ;; prints [0 10]
 (println @user-location)
@@ -139,7 +140,7 @@
 (println @running-status)
 
 ;; resets value to true
-(update!*! running-status true)
+(reset!*! running-status true)
 
 ;; prints true 
 (println @running-status)

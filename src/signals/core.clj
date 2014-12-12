@@ -303,15 +303,16 @@
                 @activate-state))
 
             KeyPathSignal
-            (conj!*! [kps v]
-              (swap! sig update-in kp conj v))
-            (disj!*! [kps v]
-              (swap! sig update-in kp disj v))
-            (assoc!*! [kps k v]
-              (swap! sig update-in kp assoc k v))
-            (dissoc!*! [kps k v]
-              (swap! sig update-in kp assoc k v))
-            (update!*! [kps v]
+            ;; FIXME - this needs to walk the sig to the root
+            (get-source-signal!*! [kps] 
+              (if (satisfies? KeyPathSignal sig)
+                (get-source-signal!*! sig)
+                sig))
+            (get-key-path!*! [kps] 
+              (if (satisfies? KeyPathSignal sig)
+                (concat (get-key-path!*! sig) kp)
+                kp))
+            (reset!*! [kps v]
               (swap! sig assoc-in kp v))
             Object
             (toString [r] "KeyPath Signal Reactor")
@@ -319,6 +320,13 @@
         ] 
     (activate r)
     (reset! ref-atom r)))
+
+;; Note this is separate as protocol funcs can not take var-args
+(defn swap!*! 
+  [kps func & args]
+  (swap! (get-source-signal!*! kps) 
+         update-in (get-key-path!*! kps)
+         (fn [old] (apply apply!*! func old args))))
 
 (defn seq!*! 
   "Converts a sequence into a PullSignal."
