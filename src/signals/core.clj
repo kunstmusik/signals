@@ -252,7 +252,69 @@
     (reset! ref-atom r)
     ))
 
+(defn kp!*!
+  "Creates a KeyPath mutable signal reactor. Reflects a sub-set of a source
+  signal. Operations on KeyPathSignals such as conj!*!, disj!*!, assoc!*!, etc.
+  are done to the source signal. Allows working with a sub-set of a signal in
+  simple way."
+  [sig kp]
+  (let [cur-value (atom (apply!*! get-in sig kp))
+        activate-state (volatile! false)
+        watches-atom (atom {})
+        ref-atom (atom nil)
+        watch-fn (fn [k r o n] 
+                   (let  [old-val @cur-value
+                          new-val (apply!*! get-in sig kp)] 
+                     (reset! cur-value new-val)
+                     (notify-watches @watches-atom @ref-atom old-val new-val)))
+        r (reify 
+            IDeref 
+            (deref [x] @cur-value)
 
+            IRef
+            (setValidator [x validator])
+            (getValidator [x] nil)
+            (getWatches [x] @watches-atom)
+            (addWatch [x k callback]
+              (swap! watches-atom assoc k callback) 
+              x)
+            (removeWatch [x k]
+              (swap! watches-atom dissoc k) 
+              x)
+
+            Reactor
+            (deactivate [r] 
+              (locking r 
+                (when @activate-state 
+                  (remove-watch sig r) 
+                  (vreset! activate-state false))))
+            (activate [r] 
+              (locking r
+                (when-not @activate-state
+                  (reset! cur-value (apply!*! get-in sig kp))
+                  (add-watch sig r watch-fn) 
+                  (vreset! activate-state true))))
+            (activated? [r] 
+              (locking r
+                @activate-state))
+
+            KeyPathSignal
+            (conj!*! [kps v]
+              (swap! sig update-in kp conj v))
+            (disj!*! [kps v]
+              (swap! sig update-in kp disj v))
+            (assoc!*! [kps k v]
+              (swap! sig update-in kp assoc k v))
+            (dissoc!*! [kps k v]
+              (swap! sig update-in kp assoc k v))
+            (update!*! [kps v]
+              (swap! sig assoc-in kp v))
+            Object
+            (toString [r] "KeyPath Signal Reactor")
+            ) 
+        ] 
+    (activate r)
+    (reset! ref-atom r)))
 
 (defn seq!*! 
   "Converts a sequence into a PullSignal."
