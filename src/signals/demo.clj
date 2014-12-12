@@ -8,8 +8,8 @@
 ;; Example: e!*!, l!*!, and r!*! blocks 
 ;; ====================================
 
-  (def a (atom []))
-  (def e (e!*! println "TEST>>>" a))
+  (def source (atom []))
+  (def value-printer (e!*! println "TEST>>> " source))
 
   (def reactive-signal 
     (r!*! 
@@ -18,7 +18,7 @@
         (map (comp clojure.string/lower-case :first-name))
         (map clojure.string/lower-case)
         (filter #(< (count %) 4))) 
-      a))
+      source))
 
   (def lazy-rs
     (l!*! 
@@ -27,13 +27,13 @@
         (map (comp clojure.string/lower-case :first-name))
         (map clojure.string/lower-case)
         (filter #(< (count %) 4))) 
-      a))
+      source))
 
   (println "First b" @reactive-signal)
   (println "First l" @lazy-rs)
 
   (reset!
-    a 
+    source 
     [{:first-name "sue"}
      {:first-name "maria"}
      {:first-name "ted"}
@@ -44,7 +44,7 @@
   (println "second b" @reactive-signal)
   (println "second l" @lazy-rs)
 
-  (reset! a [
+  (reset! source [
              {:first-name "maria"}
              {:first-name "PAN"} 
              ])
@@ -67,8 +67,8 @@
 
 
   (def actions
-    [[println "Latest Users: " b]
-     [println "Original Value: " a]
+    [[println "Latest Users: " reactive-signal]
+     [println "Original Value: " source]
      ])
 
   (defn process-actions 

@@ -1,4 +1,5 @@
 (ns signals.core
+  (:require [signals.protocols :refer :all])
   (:import [clojure.lang IDeref IRef]))
 
 ;; TODO 
@@ -8,11 +9,6 @@
 
 ;; to be used to do batch firing of signal updates...
 ;; (def ^:dynamic batch-update false)
-
-(defprotocol Reactor
-  (deactivate [r])
-  (activate [r])
-  (activated? [r]))
 
 (defn apply!*!
   "Apply function with dynamic args (IDerefs).  Before functions are applied, arguments 
@@ -121,6 +117,7 @@
             (activate [r] 
               (locking r
                 (when-not @activate-state
+                  (reset! cur-value (apply!*! func args))
                   (doseq [x sigs] (add-watch x r watch-fn)) 
                   (vreset! activate-state true))))
             (activated? [r] 

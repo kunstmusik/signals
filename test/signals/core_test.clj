@@ -1,6 +1,8 @@
 (ns signals.core-test
   (:require [clojure.test :refer :all]
-            [signals.core :refer :all]))
+            [signals.core :refer :all]
+            [signals.protocols :refer :all]
+            ))
 
 (deftest apply!*!-test 
   (testing "apply!*! processes IRef args before applying function"
