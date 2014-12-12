@@ -252,6 +252,10 @@
     (reset! ref-atom r)
     ))
 
+;; FIXME - this needs to work with KPSigs that are themselves a subset of another
+;; KPSig; the total keypath to the root Atom/Ref needs to be calculated and used 
+;; for changes. Need to add a get-keypath that recursively walks the sig and checks for
+;; satisifes? KeyPathSignal, then concat the keypaths
 (defn kp!*!
   "Creates a KeyPath mutable signal reactor. Reflects a sub-set of a source
   signal. Operations on KeyPathSignals such as conj!*!, disj!*!, assoc!*!, etc.
