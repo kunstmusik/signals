@@ -8,10 +8,14 @@ Features
 * Builds upon the apply!\*! operator to apply a function with dynamic args.  
 * Signals can be lazy or strict: lazy signals do not update their values until they are dereferenced, while strict signals are updated immediately when dependents notify of a change.
 * Seeks to make code that works with mutable values "highly visible" as well as isolated to be as small an area of the total codebase as possible. 
+* Work with sub-sets of data (KeyPath Signals) as a view upon a larger signal.  Allows reads/writes to KeyPath signals that operate with the original signal. 
 
 ## Usage
 
 Please see the [documentation](doc/intro.md) for further information about the library.
+
+Please see the [Demo](src/signals/demo.clj) for example usage.
+
 
 ## License
 
