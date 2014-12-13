@@ -102,9 +102,9 @@
          ;; {:a 4, :k :third, :b 5}}
 
 
-;; ============================================
-;; Example: Single App State and KeyPathSignals
-;; ============================================
+;; ===========================================
+;; Example: Single App State and CursorSignals
+;; ===========================================
 
 (def app-state
   (atom {:high-scores []
@@ -113,9 +113,9 @@
          }))
 
 ;; setup signals that are sub-sets of the global app-state
-(def high-scores (kp!*! app-state [:high-scores]))
-(def running-status (kp!*! app-state [:running-status]))
-(def user-location (kp!*! app-state [:user-location]))
+(def high-scores (c!*! app-state [:high-scores]))
+(def running-status (c!*! app-state [:running-status]))
+(def user-location (c!*! app-state [:user-location]))
 
 ; prints "[]"
 (println @high-scores)

@@ -252,15 +252,11 @@
     (reset! ref-atom r)
     ))
 
-;; FIXME - this needs to work with KPSigs that are themselves a subset of another
-;; KPSig; the total keypath to the root Atom/Ref needs to be calculated and used 
-;; for changes. Need to add a get-keypath that recursively walks the sig and checks for
-;; satisifes? KeyPathSignal, then concat the keypaths
-(defn kp!*!
-  "Creates a KeyPath mutable signal reactor. Reflects a sub-set of a source
-  signal. Operations on KeyPathSignals such as conj!*!, disj!*!, assoc!*!, etc.
-  are done to the source signal. Allows working with a sub-set of a signal in
-  simple way."
+;; FIXME - calculate total keypath on initialization
+(defn c!*!
+  "Creates a Cursor mutable signal reactor. Reflects a sub-set of a source
+  signal. Operations on Cursor signals with swap!*! and reset!*! 
+  are done to the source signal."
   [sig kp]
   (let [cur-value (atom (apply!*! get-in sig kp))
         activate-state (volatile! false)
@@ -302,20 +298,20 @@
               (locking r
                 @activate-state))
 
-            KeyPathSignal
-            ;; FIXME - this needs to walk the sig to the root
-            (get-source-signal!*! [kps] 
-              (if (satisfies? KeyPathSignal sig)
+            CursorSignal
+            (get-source-signal!*! [cursor] 
+              (if (satisfies? CursorSignal sig)
                 (get-source-signal!*! sig)
                 sig))
-            (get-key-path!*! [kps] 
-              (if (satisfies? KeyPathSignal sig)
+            (get-key-path!*! [cursor] 
+              (if (satisfies? CursorSignal sig)
                 (concat (get-key-path!*! sig) kp)
                 kp))
-            (reset!*! [kps v]
+            (reset!*! [cursor v]
               (swap! sig assoc-in kp v))
+
             Object
-            (toString [r] "KeyPath Signal Reactor")
+            (toString [r] "Cursor Signal Reactor")
             ) 
         ] 
     (activate r)
@@ -323,9 +319,9 @@
 
 ;; Note this is separate as protocol funcs can not take var-args
 (defn swap!*! 
-  [kps func & args]
-  (swap! (get-source-signal!*! kps) 
-         update-in (get-key-path!*! kps)
+  [cursor func & args]
+  (swap! (get-source-signal!*! cursor) 
+         update-in (get-key-path!*! cursor)
          (fn [old] (apply apply!*! func old args))))
 
 (defn seq!*! 
