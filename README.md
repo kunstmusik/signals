@@ -2,6 +2,8 @@
 
 A Clojure library for working with time-varying signals. 
 
+[![Clojars Project](http://clojars.org/kunstmusik/signals/latest-version.svg)](http://clojars.org/kunstmusik/signals)
+
 ## Highlights
 
 * Pure Clojure, builds upon IRef/IDeref.
