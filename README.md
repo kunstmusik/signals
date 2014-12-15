@@ -27,6 +27,7 @@ The following are projects that have influenced and continue to influence the de
 * [Om](https://github.com/swannodette/om)
 * [freactive](https://github.com/aaronc/freactive)
 * [reagent](https://github.com/reagent-project/reagent)
+* [Javelin](https://github.com/tailrecursion/javelin)
 * [reflex](https://github.com/lynaghk/reflex)
 * [f-reactive](https://github.com/aaronc/freactive)
 * [Zelkova](https://github.com/jamesmacaulay/zelkova)
