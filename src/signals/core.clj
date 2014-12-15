@@ -3,7 +3,7 @@
   (:import [clojure.lang IDeref IRef]))
 
 ;; TODO 
-;; * Activate/Deactivate should bubble up throughd dependents
+;; * Activate/Deactivate should bubble up through dependents
 ;; * dependents need to check if all dependencies are activated to activate themselves
 ;; * use extend-type to do activate/deactivate on Atom, Ref, etc.
 
@@ -252,19 +252,24 @@
     (reset! ref-atom r)
     ))
 
-;; FIXME - calculate total keypath on initialization
 (defn c!*!
   "Creates a Cursor mutable signal reactor. Reflects a sub-set of a source
-  signal. Operations on Cursor signals with swap!*! and reset!*! 
-  are done to the source signal."
+  signal. Operations on Cursor signals with swap!*! and reset!*! are done
+  to the source signal. Cursors can be sub-cursors of other cursors."
   [sig kp]
-  (let [cur-value (atom (apply!*! get-in sig kp))
+  (let [full-key-path (if (satisfies? CursorSignal sig) 
+                        (concat (get-key-path!*! sig) kp)
+                        kp)
+        source-sig (if (satisfies? CursorSignal sig)
+                        (get-source-signal!*! sig)
+                        sig) 
+        cur-value (atom (apply!*! get-in source-sig full-key-path))
         activate-state (volatile! false)
         watches-atom (atom {})
         ref-atom (atom nil)
         watch-fn (fn [k r o n] 
                    (let  [old-val @cur-value
-                          new-val (apply!*! get-in sig kp)] 
+                          new-val (apply!*! get-in source-sig full-key-path)] 
                      (reset! cur-value new-val)
                      (notify-watches @watches-atom @ref-atom old-val new-val)))
         r (reify 
@@ -291,7 +296,7 @@
             (activate [r] 
               (locking r
                 (when-not @activate-state
-                  (reset! cur-value (apply!*! get-in sig kp))
+                  (reset! cur-value (apply!*! get-in source-sig full-key-path))
                   (add-watch sig r watch-fn) 
                   (vreset! activate-state true))))
             (activated? [r] 
@@ -299,16 +304,10 @@
                 @activate-state))
 
             CursorSignal
-            (get-source-signal!*! [cursor] 
-              (if (satisfies? CursorSignal sig)
-                (get-source-signal!*! sig)
-                sig))
-            (get-key-path!*! [cursor] 
-              (if (satisfies? CursorSignal sig)
-                (concat (get-key-path!*! sig) kp)
-                kp))
+            (get-source-signal!*! [cursor] source-sig)
+            (get-key-path!*! [cursor] full-key-path)
             (reset!*! [cursor v]
-              (swap! sig assoc-in kp v))
+              (swap! source-sig assoc-in full-key-path v))
 
             Object
             (toString [r] "Cursor Signal Reactor")

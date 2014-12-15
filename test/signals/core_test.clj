@@ -140,3 +140,20 @@
       (is (= 4 @sig)) 
       (is (= nil @sig)) 
       )))
+
+
+(deftest c!*!-test
+  (testing "c!*! CursorSignal test"
+    (let [app-state (atom {:test {:a 1 :b {:c 30}}})
+          cursor0 (c!*! app-state [:test])
+          cursor1 (c!*! cursor0 [:b])
+          cursor2 (c!*! cursor1 [:c])
+          ]
+      (is (= {:a 1 :b {:c 30}} @cursor0)) 
+      (is (= {:c 30} @cursor1)) 
+      (is (= 30 @cursor2)) 
+      (reset!*! cursor2 40)
+      (is (= {:a 1 :b {:c 40}} @cursor0)) 
+      (is (= {:c 40} @cursor1)) 
+      (is (= 40 @cursor2)) 
+      )))
