@@ -19,7 +19,9 @@ Please see the [documentation](doc/intro.md) for further information about the l
 
 Please see the [demo file](src/signals/demo.clj) for example usage.
 
-## Inspirations
+## Influences
+
+The following are projects that have influenced and continue to influence the development of Signals:
 
 * [Elm](http://elm-lang.org)
 * [Om](https://github.com/swannodette/om)

@@ -1,4 +1,4 @@
-(defproject kunstmusik/signals "0.1.0-SNAPSHOT"
+(defproject kunstmusik/signals "0.1.0"
   :description "A library for working with time-varying signals"
   :url "http://github.com/kunstmusik/signals"
   :license {:name "Eclipse Public License"
