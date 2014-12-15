@@ -1,6 +1,6 @@
 # Signals
 
-This is a library for working with time-varying signals. It works to leverage Clojure's existing IRef and IDeref interfaces for both push and pull based signal dependent code blocks.   
+This is a library for working with time-varying signals/mutable data. It works to leverage Clojure's existing IRef and IDeref interfaces for both push and pull based signal dependent code blocks.   
 
 ## Definitions
 
@@ -37,5 +37,3 @@ Code should be classified primarily into:
 ### Notes
 
 * History of values for a signal is not a primary concern of this library at this time, though it may be introduced later. 
-* Time Counters - Originally considered necessary but removed.  May reintroduce later. Concept was that all Signals had their own notion of time and time counters would change on each update of a ref.  
-* Timeline - an observer's view of signals over time.  A signal is an observer of its own timestate and thus has its own timeline. Timelines should be a total view of time over n number of signals. Multiple timelines can exist that share observations of signal times.  (Not yet implemented.)

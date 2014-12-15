@@ -5,12 +5,12 @@
             ))
 
 (deftest apply!*!-test 
-  (testing "apply!*! processes IRef args before applying function"
+  (testing "apply!*! processes IDeref args before applying function"
     (is (= 4 (apply!*! + (atom 1) (atom 3))))
     ))
 
 (deftest partial!*!-test 
-  (testing "partial!*! processes IRef args before applying function"
+  (testing "partial!*! processes IDeref args before applying function"
     (let [a (atom 1)
           b (atom 3)
           temp (partial!*! + a b)] 
