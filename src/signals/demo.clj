@@ -232,10 +232,13 @@
 (print @blog-post)
 
 
+;; ================
+;; Speculative Work 
+;; ================
+
 ;; experiments with reductions, iteratees: so far, doesn't handle EOF, or
-;; if func produces multiple outs for single in probably better at this
-;; point to just focus on the pushy chain and context, most likely don't
-;; need this
+;; if func produces multiple outs for single in. Not sure if any of this 
+;; is necessary, but leaving here for now until a decision is made.
 
 
   (deftype Last [a]
